@@ -59,7 +59,10 @@ async function getGroupPostContent(driver, postLink) {
     postId,
     images: [],
     content: '',
+    comments: [],
   };
+
+  await getComments(driver, post.comments);
 
   let contentElement = await driver.findElements(
     By.xpath('//div[@data-gt=\'{"tn":"*s"}\']')
@@ -113,22 +116,65 @@ async function getGroupPostContent(driver, postLink) {
   return post;
 }
 
+/**
+ * @param {import('selenium-webdriver').WebDriver} driver
+ * @param {string[]} result
+ */
+async function getComments(driver, result) {
+  const comments = await driver.findElements(By.xpath("//div[@class='dm']"));
+
+  for (const cmt of comments) {
+    const t = await cmt.getText();
+    // const cmtText = t.substring(t.indexOf('\n') + 1).trim();
+    result.push(t);
+  }
+
+  const moreComments = await driver.findElements(By.className('dm dn'));
+
+  if (moreComments.length > 0) {
+    const link = await moreComments[0].findElement(By.css('a'));
+    await link.click();
+    await getComments(driver, result);
+  }
+}
+
 (async function openChromeTest() {
+  let driver = await new Builder().forBrowser('chrome').build();
   try {
-    let driver = await new Builder().forBrowser('chrome').build();
+    const groupId = '540138377786557';
 
     await loginFB(driver, process.env.FB_USERNAME, process.env.FB_PASSWORD);
     await delay(1000);
-    const postLinks = await getGroupPosts(driver, '540138377786557');
-    await delay(500);
-    for (const link of postLinks) {
+    // const postLinks = await getGroupPosts(driver, '540138377786557');
+    // await delay(500);
+    await driver.get(`https://mbasic.facebook.com/groups/${groupId}`);
+    const els = await driver.findElements(
+      By.xpath("//a[contains(text(), 'Full Story')]")
+    );
+    const groupPostLinks = [];
+
+    for (const el of els) {
+      const link = await el.getAttribute('href');
+      groupPostLinks.push(link);
+      // await el.click();
+      // await driver.navigate().back();
+      // await delay(1000);
+    }
+
+    for (const link of groupPostLinks) {
       const post = await getGroupPostContent(driver, link);
       console.log(post);
       await delay(500);
     }
 
-    await driver.quit();
+    // for (const link of postLinks) {
+    //   const post = await getGroupPostContent(driver, link);
+    //   console.log(post);
+    //   await delay(500);
+    // }
   } catch (error) {
     console.log(error);
+  } finally {
+    await driver.quit();
   }
 })();
